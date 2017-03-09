@@ -1,0 +1,86 @@
+# -*- coding=utf-8 -*-
+#author :Rouzip
+#Time:2017.3.8
+#version:1.0.0
+from socket import *
+import struct
+import time
+host = '202.197.61.231'
+port = 10086
+
+#连接服务器函数
+def connect(host,port):
+    s = socket(AF_INET,SOCK_STREAM)
+    s.connect((host,port))
+    return s
+
+#ListAll函数
+def listAll(socket):
+    get=struct.pack('!B',1)
+    socket.send(get)#发送消息
+    rec = socket.recv(1024)
+    sign = struct.unpack('!B',bytes(rec[0]))
+    if sign:
+        sign,size = struct.unpack('!BH',rec)
+        data = socket.recv(4096)
+    else:
+        sign,size = struct.unpack('!BB',rec)
+        data = socket.recv(size)
+    print(str(data,encoding='utf-8'))
+    socket.close()
+
+
+#Get函数
+def Get(socket):
+    file_name = input('Please input the file you want to download:')
+    length = len(file_name)
+    getInfo = struct.pack('!BB'+str(length)+'s',0,length,bytes(file_name,\
+                                                         encoding='utf-8'))
+    socket.send(getInfo)
+    res = socket.recv(1024)
+    insign,file_size=struct.unpack('!BL',res)
+    if insign == 2:#文件下载成功
+        rece_size = 0
+        with open(file_name,'wb') as fp:#储存进缓存区，然后写入文件
+            while rece_size<file_size:
+                file_data=socket.recv(1024)
+                rece_size += len(file_data)
+                fp.write(file_data)
+        socket.close()
+    else:#文件下载失败
+        inf = socket.recv(file_size)
+        inF = struct.unpack(str(file_size,encoding='utf-8'),inf)
+        print(inF)#提示错误信息
+        socket.close()
+
+
+#Put函数
+def Put(socket):
+    file_name = input('Please input the file you want to input:')
+    length = len(file_name)
+    with open(file_name,'rb') as fp:
+        data = bytes()
+        for line in fp:
+            data += line
+    file_length = len(data)
+    putInf = struct.pack('!BBL'+str(length)+'s'+\
+                       str(file_length)+'s',2,length,file_length,\
+                       bytes(file_name,encoding='utf-8'),data)
+    socket.send(putInf)
+    socket.close()
+
+#程序使用段：
+socket=connect(host,port)
+command=input('Please choose Get / Put / ListAll / exit:')
+if command == 'Get':
+    Get(socket)
+elif command == 'Put':
+    Put(socket)
+elif command == 'ListAll':
+    listAll(socket)
+elif command == 'exit':
+    pass
+else:
+    print('Choose false!')
+    pass
+#仍旧存在的问题：无法使用循环来重复建立连接，无法找到调用对象？
