@@ -1,86 +1,126 @@
 # -*- coding=utf-8 -*-
 #author :Rouzip
-#Time:2017.3.8
-#version:1.0.0
+#Time:2017.3.12
+#version:1.1.0
 from socket import *
 import struct
-import time
-host = '202.197.61.231'
-port = 10086
+import os
 
-#连接服务器函数
-def connect(host,port):
-    s = socket(AF_INET,SOCK_STREAM)
-    s.connect((host,port))
-    return s
-
-#ListAll函数
-def listAll(socket):
-    get=struct.pack('!B',1)
-    socket.send(get)#发送消息
-    rec = socket.recv(1024)
-    sign = struct.unpack('!B',bytes(rec[0]))
-    if sign:
-        sign,size = struct.unpack('!BH',rec)
-        data = socket.recv(4096)
-    else:
-        sign,size = struct.unpack('!BB',rec)
-        data = socket.recv(size)
-    print(str(data,encoding='utf-8'))
-    socket.close()
-
-
-#Get函数
-def Get(socket):
-    file_name = input('Please input the file you want to download:')
-    length = len(file_name)
-    getInfo = struct.pack('!BB'+str(length)+'s',0,length,bytes(file_name,\
-                                                         encoding='utf-8'))
-    socket.send(getInfo)
-    res = socket.recv(1024)
-    insign,file_size=struct.unpack('!BL',res)
-    if insign == 2:#文件下载成功
-        rece_size = 0
-        with open(file_name,'wb') as fp:#储存进缓存区，然后写入文件
-            while rece_size<file_size:
-                file_data=socket.recv(1024)
-                rece_size += len(file_data)
-                fp.write(file_data)
-        socket.close()
-    else:#文件下载失败
-        inf = socket.recv(file_size)
-        inF = struct.unpack(str(file_size,encoding='utf-8'),inf)
-        print(inF)#提示错误信息
-        socket.close()
+class project(object):
+    HOST = '202.197.61.231'
+    PORT = 10086
+    ADR=(HOST,PORT)#服务器地址
+    def __init__(self):
+        #连接到服务器
+        try:
+            self.socketCilent = socket(AF_INET,SOCK_STREAM)
+            self.socketCilent.connect(self.ADR)
+            while True:
+                choice = self.sendMSG()
+                if 'Put' == choice:
+                    self.Put()
+                elif 'Get' == choice:
+                    self.Get()
+                else:
+                    self.listAll()
+        except socket.error as exc:
+            print('Socket error %s') % exc
+        finally:
+            self.socketCilent.close()
 
 
-#Put函数
-def Put(socket):
-    file_name = input('Please input the file you want to input:')
-    length = len(file_name)
-    with open(file_name,'rb') as fp:
-        data = bytes()
-        for line in fp:
-            data += line
-    file_length = len(data)
-    putInf = struct.pack('!BBL'+str(length)+'s'+\
-                       str(file_length)+'s',2,length,file_length,\
-                       bytes(file_name,encoding='utf-8'),data)
-    socket.send(putInf)
-    socket.close()
+    #向服务器发送消息
+    def sendMSG(self):
+        mesg = input('Please input your command:ListAll  Put  Get  exit\n')
+        choice = ['ListAll','Put','Get','exit']
+        for i in choice:
+            if mesg == i:
+                break
+        #如果选择错误
+        else:
+            print('error,please choose again!')
+            mesg = self.sendMSG()
+        return mesg
 
-#程序使用段：
-socket=connect(host,port)
-command=input('Please choose Get / Put / ListAll / exit:')
-if command == 'Get':
-    Get(socket)
-elif command == 'Put':
-    Put(socket)
-elif command == 'ListAll':
-    listAll(socket)
-elif command == 'exit':
-    pass
-else:
-    print('Choose false!')
-    pass
-#仍旧存在的问题：无法使用循环来重复建立连接，无法找到调用对象？
+
+    #ListAll函数
+    def listAll(self):
+        listMsg = struct.pack('!B',1)
+        self.socketCilent.send(listMsg)#发送消息
+        rec = self.socketCilent.recv(1024)
+        mesSign, listLen = struct.unpack('!BH',rec)
+        print('----------------SIGN-----------------\n\n{0}'.format(mesSign))
+        print('-------------LISTLENGTH----------------\n{0}'.format(listLen))
+        data = self.socketCilent.recv(4096)
+        print(str(data,encoding='utf-8'))
+        self.socketCilent.close()
+        #重新连接
+        self.socketCilent = socket(AF_INET,SOCK_STREAM)
+        self.socketCilent.connect(self.ADR)
+
+
+
+    #Get函数
+    def Get(self):
+        fileName = input('Please input the file you want to download:')
+        nameLen = len(fileName)
+        getInfo = struct.pack('!BB'+str(nameLen)+'s',\
+                              0,nameLen,bytes(fileName,encoding='utf-8'))
+        self.socketCilent.send(getInfo)
+        rec = self.socketCilent.recv(1024)
+        #文件下载成功
+        if rec[0] == 2:
+            fileSize, = struct.unpack('!L',bytes(rec[1:]))
+            receSize = 0
+            #储存进缓存区，然后写入文件
+            with open(fileName,'wb') as fp:
+                while receSize<fileSize:
+                    fileData = self.socketCilent.recv(1024)
+                    receSize += len(fileData)
+                    fp.write(fileData)
+            print('File has received successfully!')
+            self.socketCilent.close()
+        #文件下载失败，服务器传回错误信息
+        else:
+            errSize = rec[1]
+            errInfo = self.socketCilent.recv(errSize)
+            print(str(errInfo,encoding='utf-8'))
+            self.socketCilent.close()
+        #重新连接
+        self.socketCilent = socket(AF_INET,SOCK_STREAM)
+        self.socketCilent.connect(self.ADR)
+
+
+    #Put函数
+    def Put(self):
+        fileName = input('Please input the file you want to input:')
+        #判断是否有这个文件
+        dir = os.listdir('.')
+        for i in dir:
+            if i == fileName:
+                break
+        else:
+            print('Don\' has this document,please choose again!')
+            self.Put()
+        nameLen = len(fileName)
+        #打开并读取文件
+        with open(fileName,'rb') as fp:
+            fileData = bytes()
+            for line in fp:
+                fileData += line
+        fileLength = len(fileData)
+        putInf = struct.pack('!BBL'+str(nameLen)+'s'+\
+                           str(fileLength)+'s',2,nameLen,fileLength,\
+                           bytes(fileName,encoding='utf-8'),fileData)
+        #发送文件
+        self.socketCilent.send(putInf)
+        print('Input successfully!')
+        self.socketCilent.close()
+        #重新连接
+        self.socketCilent = socket(AF_INET,SOCK_STREAM)
+        self.socketCilent.connect(self.ADR)
+
+
+if __name__ == '__main__':
+    p = project()
+
