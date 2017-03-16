@@ -65,7 +65,7 @@ class project(object):
     # 从服务器下载文件
     def Get(self):
         fileName = input('Please input the file you want to download:')
-        nameLen = len(fileName)
+        nameLen = len(fileName.encode('utf-8'))
         getInfo = struct.pack('!BB'+str(nameLen)+'s',\
                               0,\
                               nameLen,\
@@ -106,7 +106,7 @@ class project(object):
         else:
             print('Don\' has this document, please choose again!')
             self.Put()
-        nameLen = len(fileName)
+        nameLen = len(fileName.encode('utf-8'))
         # 打开并读取文件
         with open(fileName,'rb') as fp:
             fileData = bytes()
