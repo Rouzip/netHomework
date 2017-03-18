@@ -1,10 +1,12 @@
-# -*- coding=utf-8 -*-
+#coding=utf-8
 # author :Rouzip
 # Time:2017.3.12
 # version:1.1.1
 from socket import *
 import struct
 import os
+import asyncio
+import time
 
 class project(object):
     HOST = '202.197.61.231'
@@ -55,8 +57,11 @@ class project(object):
         mesSign, listLen = struct.unpack('!BH',rec)
         print('----------------SIGN-----------------\n\n{0}'.format(mesSign))
         print('-------------LISTLENGTH----------------\n{0}'.format(listLen))
-        data = self.socketCilent.recv(4096)
-        print(str(data,encoding = 'utf-8'))
+        dataLen = 0
+        while dataLen < listLen:
+            data = self.socketCilent.recv(1024)
+            print(str(data,encoding='utf-8'))
+            dataLen += len(data)
         self.socketCilent.close()
         # 重新连接
         self.socketCilent = socket(AF_INET,SOCK_STREAM)
