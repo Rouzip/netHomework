@@ -22,8 +22,10 @@ class project(object):
                     self.Put()
                 elif 'Get' == choice:
                     self.Get()
-                else:
+                elif 'ListAll' == choice:
                     self.listAll()
+                else:
+                    break
         except socket.error as exc:
             print('Socket error {0}'.format(exc))
         finally:
