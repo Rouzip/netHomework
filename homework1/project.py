@@ -5,8 +5,7 @@
 from socket import *
 import struct
 import os
-import asyncio
-import time
+
 
 class project(object):
     HOST = '202.197.61.231'
